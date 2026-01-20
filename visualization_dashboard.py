@@ -18,7 +18,7 @@ sns.set_palette("husl")
 # Setup Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = BASE_DIR
-MAPS_DIR = os.path.join(BASE_DIR, '../maps-master/Survey-of-India-Index-Maps/Boundaries')
+MAPS_DIR = os.path.join(BASE_DIR, 'maps/Boundaries')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'visualizations')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

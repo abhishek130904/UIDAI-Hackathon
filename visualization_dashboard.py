@@ -7,7 +7,7 @@ import matplotlib.dates as mdates
 import seaborn as sns
 import geopandas as gpd
 from sklearn.ensemble import IsolationForest
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 from matplotlib.ticker import FuncFormatter
 
 # --- System Configuration ---
@@ -18,7 +18,8 @@ sns.set_palette("husl")
 # Setup Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = BASE_DIR
-MAPS_DIR = os.path.join(BASE_DIR, 'maps/Boundaries')
+# UPDATED PATH: Looks for 'maps/Boundaries' inside the project folder
+MAPS_DIR = os.path.join(BASE_DIR, 'maps', 'Boundaries')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'visualizations')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -69,13 +70,19 @@ for df in [df_enr, df_bio, df_demo]:
     df['district'] = df['district'].apply(clean_location_name)
 
 print("--> Loading Shapefiles...")
-gdf_states = gpd.read_file(os.path.join(MAPS_DIR, 'India-States.shp'))
-gdf_districts = gpd.read_file(os.path.join(MAPS_DIR, 'India-Districts-2011Census.shp'))
-
-# Normalize shapefile names
-gdf_states['state_norm'] = gdf_states['ST_NM'].apply(clean_location_name)
-gdf_districts['state_norm'] = gdf_districts['ST_NM'].apply(clean_location_name)
-gdf_districts['dist_norm'] = gdf_districts['DISTRICT'].apply(clean_location_name)
+# Improved Shapefile Loading Logic
+try:
+    gdf_states = gpd.read_file(os.path.join(MAPS_DIR, 'India-States.shp'))
+    gdf_districts = gpd.read_file(os.path.join(MAPS_DIR, 'India-Districts-2011Census.shp'))
+    
+    # Normalize shapefile names
+    gdf_states['state_norm'] = gdf_states['ST_NM'].apply(clean_location_name)
+    gdf_districts['state_norm'] = gdf_districts['ST_NM'].apply(clean_location_name)
+    gdf_districts['dist_norm'] = gdf_districts['DISTRICT'].apply(clean_location_name)
+    has_maps = True
+except Exception as e:
+    print(f"Warning: Shapefiles not found in {MAPS_DIR}. Maps will be skipped.")
+    has_maps = False
 
 # 3. AGGREGATION ENGINE
 print("--> Aggregating Operational Metrics...")
@@ -130,10 +137,11 @@ dist_stats['child_share'] = (dist_stats['age_0_5'] + dist_stats['age_5_17']) / (
 dist_stats['load_per_pincode'] = dist_stats['total_bio'] / (dist_stats['num_pincodes'] + 1e-6)
 
 # --- Geospatial Merging ---
-print("--> Joining Data with Shapefiles...")
-india_map = gdf_states.merge(state_stats, left_on='state_norm', right_on='state', how='left').fillna(0)
-district_map = gdf_districts.merge(dist_stats, left_on=['state_norm', 'dist_norm'], 
-                                   right_on=['state', 'district'], how='left').fillna(0)
+if has_maps:
+    print("--> Joining Data with Shapefiles...")
+    india_map = gdf_states.merge(state_stats, left_on='state_norm', right_on='state', how='left').fillna(0)
+    district_map = gdf_districts.merge(dist_stats, left_on=['state_norm', 'dist_norm'], 
+                                       right_on=['state', 'district'], how='left').fillna(0)
 
 # 4. VISUALIZATION SUITE
 
@@ -144,6 +152,7 @@ def save_viz(filename):
     print(f"   Saved: {filename}")
 
 def robust_map_plot(gdf, col, title, cmap, filename, label=''):
+    if not has_maps: return
     fig, ax = plt.subplots(figsize=(10, 10))
     # Handle outliers for better color contrast
     vmax = np.percentile(gdf[col], 95)
@@ -156,18 +165,20 @@ def robust_map_plot(gdf, col, title, cmap, filename, label=''):
     save_viz(filename)
 
 # --- PART A: GEOSPATIAL MAPS ---
-print("--> Generating Geospatial Maps...")
+if has_maps:
+    print("--> Generating Geospatial Maps...")
+    # National Level
+    robust_map_plot(india_map, 'bio_age_5_17', 'Biometric Updates (Age 5-17)', 'YlOrRd', '01_state_bio_map.png', 'Updates')
+    robust_map_plot(india_map, 'total_enr', 'Total Enrolments', 'Blues', '02_state_enr_map.png', 'Enrolments')
+    robust_map_plot(india_map, 'total_demo', 'Demographic Updates', 'Greens', '03_state_demo_map.png', 'Updates')
 
-# National Level
-robust_map_plot(india_map, 'bio_age_5_17', 'Biometric Updates (Age 5-17)', 'YlOrRd', '01_state_bio_map.png', 'Updates')
-robust_map_plot(india_map, 'total_enr', 'Total Enrolments', 'Blues', '02_state_enr_map.png', 'Enrolments')
-robust_map_plot(india_map, 'total_demo', 'Demographic Updates', 'Greens', '03_state_demo_map.png', 'Updates')
-
-# District Level
-robust_map_plot(district_map, 'bio_age_5_17', 'District Biometric Updates', 'YlOrRd', '04_district_bio_map.png', 'Updates')
-robust_map_plot(district_map, 'total_enr', 'District Enrolment Intensity', 'Blues', '05_district_enr_map.png', 'Enrolments')
-robust_map_plot(district_map, 'total_demo', 'District Demographic Updates', 'Greens', '06_district_demo_map.png', 'Updates')
-robust_map_plot(district_map, 'load_per_pincode', 'Pincode Service Load Density', 'RdPu', '07_pincode_load_map.png', 'Avg Updates/Center')
+    # District Level
+    robust_map_plot(district_map, 'bio_age_5_17', 'District Biometric Updates', 'YlOrRd', '04_district_bio_map.png', 'Updates')
+    robust_map_plot(district_map, 'total_enr', 'District Enrolment Intensity', 'Blues', '05_district_enr_map.png', 'Enrolments')
+    robust_map_plot(district_map, 'total_demo', 'District Demographic Updates', 'Greens', '06_district_demo_map.png', 'Updates')
+    robust_map_plot(district_map, 'load_per_pincode', 'Pincode Service Load Density', 'RdPu', '07_pincode_load_map.png', 'Avg Updates/Center')
+else:
+    print("--> Skipping Maps (Shapefiles missing)...")
 
 # --- PART B: TIME SERIES & FORECASTING ---
 print("--> Generating Time Series Analysis...")
@@ -179,14 +190,9 @@ daily_demo = df_demo.groupby('date')[['demo_age_5_17', 'demo_age_17_']].sum().so
 
 # 8. Daily Biometric Trend
 fig, ax = plt.subplots(figsize=(12, 6))
-ax.plot(daily_bio.index, daily_bio['bio_age_5_17'], label='Age 5-17', color='#3498db', alpha=0.4)
-ax.plot(daily_bio.index, daily_bio['bio_age_17_'], label='Age 17+', color='#e74c3c', alpha=0.3)
-
-# 7-day Moving Average for clarity
-ax.plot(daily_bio.index, daily_bio['bio_age_5_17'].rolling(7).mean(), color='#2980b9', lw=2, label='5-17 (7d Avg)')
-ax.plot(daily_bio.index, daily_bio['bio_age_17_'].rolling(7).mean(), color='#c0392b', lw=2, label='17+ (7d Avg)')
-
-ax.set_title('Daily Biometric Updates Trend (with 7-day Moving Average)', fontweight='bold')
+ax.plot(daily_bio.index, daily_bio['bio_age_5_17'], label='Age 5-17', color='#3498db')
+ax.plot(daily_bio.index, daily_bio['bio_age_17_'], label='Age 17+', color='#e74c3c')
+ax.set_title('Daily Biometric Updates Trend', fontweight='bold')
 ax.legend()
 save_viz('08_daily_bio_trend.png')
 
@@ -233,37 +239,28 @@ ax2.tick_params(axis='y', labelcolor='#3498db')
 plt.title('Combined Trend: Enrolment vs Updates', fontsize=14, fontweight='bold')
 save_viz('12_combined_trend.png')
 
-# 13. Holt-Winters Forecasting
-print("--> Running Robust Forecasting (Holt-Winters)...")
-
-# Prepare Time Series - Handle daily gaps (Interpolate instead of fill 0 for smoother HW)
-ts_data = daily_bio['bio_age_5_17'].asfreq('D').interpolate(method='linear')
-
-# Holt-Winters Exponential Smoothing with Multiplicative Seasonality
-# Seasonal period = 7 (weekly)
-model = ExponentialSmoothing(ts_data, 
-                             seasonal_periods=7, 
-                             trend='add', 
-                             seasonal='add').fit()
+# 13. SARIMA Forecasting
+print("--> Running Forecasting Model (SARIMA)...")
+ts_data = daily_bio['bio_age_5_17'].asfreq('D').fillna(0)
+model = SARIMAX(ts_data, 
+                order=(1, 1, 1), 
+                seasonal_order=(1, 1, 1, 7), 
+                enforce_stationarity=False,
+                enforce_invertibility=False)
+model_fit = model.fit(disp=False)
 
 # Forecast
-steps = 30
-forecast = model.forecast(steps)
+forecast_obj = model_fit.get_forecast(steps=30)
+forecast = forecast_obj.predicted_mean
+conf_int = forecast_obj.conf_int()
 
 fig, ax = plt.subplots(figsize=(12, 6))
-
-# Plot historical (Last 90 days)
-ax.plot(ts_data.index[-90:], ts_data[-90:], label='Historical Data', color='#34495e', alpha=0.7)
-
-# Plot Forecast
-ax.plot(forecast.index, forecast, label='30-Day Forecast', color='#e67e22', linestyle='-', lw=2.5)
-
-# Visual polish
-ax.fill_between(forecast.index, forecast*0.85, forecast*1.15, color='#e67e22', alpha=0.1, label='Confidence Zone (±15%)')
-
-ax.set_title('Aadhaar Biometric Demand Forecast (Holt-Winters Seasonal Smoothing)', fontweight='bold')
+ax.plot(ts_data.index[-90:], ts_data[-90:], label='Historical (Last 90 Days)', color='#34495e', alpha=0.7)
+ax.plot(forecast.index, forecast, label='30-Day Forecast', color='#e74c3c', linestyle='--', lw=2)
+ax.fill_between(forecast.index, conf_int.iloc[:, 0], conf_int.iloc[:, 1], color='#e74c3c', alpha=0.1)
+ax.set_title('Forecast: Biometric Demand (SARIMA)', fontweight='bold')
 ax.legend()
-save_viz('13_demand_forecast.png')
+save_viz('13_sarima_forecast.png')
 
 # --- PART C: COMPARATIVE ANALYSIS ---
 print("--> Generating Comparative Charts...")
@@ -326,23 +323,14 @@ ax.set_title('Overall Enrolment Age Distribution', fontweight='bold')
 save_viz('19_age_distribution.png')
 
 # 20. Child vs Adult Scatter (Size = Pincodes)
-fig, ax = plt.subplots(figsize=(12, 10))
+fig, ax = plt.subplots(figsize=(10, 8))
 sc = ax.scatter(state_stats['bio_age_5_17'], state_stats['bio_age_17_'], 
                 s=state_stats['num_pincodes']/5, alpha=0.6, 
-                c=state_stats['total_enr'], cmap='viridis', edgecolors='white')
+                c=state_stats['total_enr'], cmap='viridis')
 plt.colorbar(sc, label='Total Enrolments')
-
-# Annotate Top 10 States
-top_10_states = state_stats.nlargest(10, 'total_bio')
-for _, row in top_10_states.iterrows():
-    ax.annotate(row['state'].title(), 
-                (row['bio_age_5_17'], row['bio_age_17_']),
-                fontsize=9, fontweight='bold', alpha=0.8,
-                xytext=(5, 5), textcoords='offset points')
-
-ax.set_xlabel('Child Biometric Updates (5-17)')
-ax.set_ylabel('Adult Biometric Updates (17+)')
-ax.set_title('State-wise Child vs Adult Workload (Size = Unique Pincodes)', fontweight='bold')
+ax.set_xlabel('Child Updates')
+ax.set_ylabel('Adult Updates')
+ax.set_title('Child vs Adult Volume (Bubble Size = #Pincodes)', fontweight='bold')
 save_viz('20_bubble_chart.png')
 
 # --- PART E: MACHINE LEARNING & ANOMALY DETECTION ---
@@ -366,23 +354,15 @@ anomalies[['state', 'district', 'total_bio', 'UER', 'child_share']].to_csv(
 print("   Saved: anomaly_detection_report.csv")
 
 # 21. Anomaly Scatter Plot
-fig, ax = plt.subplots(figsize=(12, 7))
+fig, ax = plt.subplots(figsize=(10, 6))
 normal = dist_stats[dist_stats['anomaly_score'] == 1]
-ax.scatter(normal['total_enr'], normal['total_bio'], c='blue', alpha=0.15, label='Normal', s=15)
-ax.scatter(anomalies['total_enr'], anomalies['total_bio'], c='red', alpha=0.9, label='Anomaly Flag', s=60, edgecolors='black')
-
-# Label Anomalous Districts (Filter for prominent ones to avoid clutter)
-for _, row in anomalies.iterrows():
-    ax.annotate(row['district'].title(), 
-                (row['total_enr'], row['total_bio']),
-                fontsize=8, xytext=(3, 3), textcoords='offset points', alpha=0.7)
-
+ax.scatter(normal['total_enr'], normal['total_bio'], c='blue', alpha=0.2, label='Normal', s=15)
+ax.scatter(anomalies['total_enr'], anomalies['total_bio'], c='red', alpha=0.8, label='Anomaly', s=50, edgecolors='k')
 ax.set_xlabel('Total Enrolments')
 ax.set_ylabel('Total Biometric Updates')
-ax.set_title('Anomaly Detection: High-Intensity Operational Irregularities', fontweight='bold')
+ax.set_title('Anomaly Detection: Districts with Irregular Patterns', fontweight='bold')
 ax.legend()
 save_viz('21_anomaly_scatter.png')
-
 
 # 22. UER Distribution (Stress Analysis)
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -394,5 +374,5 @@ ax.legend()
 save_viz('22_uer_distribution.png')
 
 print("="*60)
-print(f"✅ Dashboard Generation Complete. All 21 visualizations stored in: {OUTPUT_DIR}")
+print(f"✅ Dashboard Generation Complete. All 22 visualizations stored in: {OUTPUT_DIR}")
 print("="*60)

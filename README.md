@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🚀 Lifecycle & Inclusivity Predictor
+# Lifecycle & Inclusivity Predictor
 ### UIDAI Hackathon Submission (Team UIDAI_8037)
 **Analyzing enrollment data to identify patterns, detect fraud, and support policy decisions**
 
@@ -8,7 +8,7 @@
 
 ---
 
-## 📌 About the Project
+## About the Project
 
 This project was built for the UIDAI Hackathon to transform raw Aadhaar logs into actionable intelligence. We process enrollment, biometric update, and demographic records to help identify operational bottlenecks, geographic patterns, and districts requiring infrastructure interventions.
 
@@ -18,7 +18,7 @@ The analysis outputs risk scores, flags anomalies using Machine Learning, genera
 
 ---
 
-## 🎯 Objectives
+## Objectives
 
 - **Data Integration:** Merge fragmented CSV files (Enrolment, Biometric, Demographic) into a unified analytical timeline.
 - **Predictive Planning:** Forecast biometric update demand 30 days in advance using **SARIMA** to handle weekly operational cycles.
@@ -28,7 +28,7 @@ The analysis outputs risk scores, flags anomalies using Machine Learning, genera
 
 ---
 
-## ✨ Features
+## Features
 
 **1. Data Engineering & Normalization**
 - Automated cleaning of district names to match Census 2011 shapefiles (e.g., handling *Allahabad* → *Prayagraj*).
@@ -67,7 +67,7 @@ The analysis outputs risk scores, flags anomalies using Machine Learning, genera
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 UIDAI-Hackathon/
@@ -93,7 +93,7 @@ UIDAI-Hackathon/
 
 ---
 
-## ⚙️ Installation & Run
+## Installation & Run
 
 We've included a helper script to automate the environment setup.
 
@@ -132,7 +132,7 @@ We've included a helper script to automate the environment setup.
 
 ---
 
-## ⚠️ Limitations
+## Limitations
 
 1.  **Shapefiles:** The code expects `India-States.shp` and `India-Districts-2011Census.shp` in the `../maps-master/` directory. If missing, map generation is skipped.
 2.  **Memory:** Processing ~5M records requires about 4GB RAM.
@@ -140,7 +140,7 @@ We've included a helper script to automate the environment setup.
 
 ---
 
-## 📚 Learning Outcomes
+## Learning Outcomes
 
 This project was a valuable learning experience that helped us develop several skills:
 
